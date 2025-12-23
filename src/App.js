@@ -8,6 +8,9 @@ import { Slate, Editable, withReact } from 'slate-react'
 
 // Import the `Editor` and `Transforms` helpers from Slate.
 import { Editor, Transforms, Element, Node } from 'slate'
+
+import { FileExplorer, FileTreeItem } from './fileexplorer.js';
+
 // Store the file path globally or in state
 let scriptPath = null;
 
@@ -41,11 +44,11 @@ async function run() {
         console.error("No script path available. Did you save the file?");
         return;
       }
-      
+
       // Use absolute path with quotes to handle spaces
       const command = `python3 "${scriptPath}"`;
       console.log("Executing:", command);
-      
+
       const result = await window.api.runCommand(command);
       if (result.success) {
         console.log("Output:", result.stdout);
@@ -131,6 +134,31 @@ const withCodeBlocks = (editor) => {
 
 const App = () => {
   const [editor] = useState(() => withCodeBlocks(withReact(createEditor())))
+  // test
+  const [fileTree] = useState([
+    {
+      name: 'src',
+      type: 'folder',
+      children: [
+        { name: 'App.js', type: 'file' },
+        { name: 'index.js', type: 'file' },
+        {
+          name: 'components',
+          type: 'folder',
+          children: [
+            { name: 'Header.js', type: 'file' },
+            { name: 'Footer.js', type: 'file' }
+          ]
+        }
+      ]
+    },
+    { name: 'package.json', type: 'file' },
+    { name: 'README.md', type: 'file' }
+  ]);
+
+  const handleFileClick = (file) => {
+    console.log('File clicked:', file);
+  };
 
   const initialValue = useMemo(
     () =>
@@ -157,77 +185,84 @@ const App = () => {
   }, [])
 
   return (
-    // Add a toolbar with buttons that call the same methods.
-    <Slate editor={editor} initialValue={initialValue}
-      onChange={value => {
-        const isAstChange = editor.operations.some(
-          op => 'set_selection' !== op.type
-        )
-        if (isAstChange) {
-          // Save the value to Local Storage.
-          const content = JSON.stringify(value)
-          localStorage.setItem('content', content)
-        }
-      }}
-    >
-      <div>
-        <button
-          style={{ margin: '10px' }}
-          onMouseDown={event => {
-            event.preventDefault()
-            CustomEditor.toggleBoldMark(editor)
-          }}
-        >
-          Bold
-        </button>
-        <button
-          style={{ margin: '10px' }}
-          onMouseDown={event => {
-            event.preventDefault()
-            CustomEditor.toggleCodeBlock(editor)
-          }}
-        >
-          Code Block
-        </button>
+    <>
+      <div style={{ display: 'flex' }}>
+        <FileExplorer fileTree={fileTree} onFileClick={handleFileClick} />
+        <div style={{ flex: 1, padding: '20px' }}>
+          <Slate editor={editor} initialValue={initialValue}
+            onChange={value => {
+              const isAstChange = editor.operations.some(
+                op => 'set_selection' !== op.type
+              )
+              if (isAstChange) {
+                // Save the value to Local Storage.
+                const content = JSON.stringify(value)
+                localStorage.setItem('content', content)
+              }
+            }}
+          >
+            <div>
+              <button
+                style={{ margin: '10px' }}
+                onMouseDown={event => {
+                  event.preventDefault()
+                  CustomEditor.toggleBoldMark(editor)
+                }}
+              >
+                Bold
+              </button>
+              <button
+                style={{ margin: '10px' }}
+                onMouseDown={event => {
+                  event.preventDefault()
+                  CustomEditor.toggleCodeBlock(editor)
+                }}
+              >
+                Code Block
+              </button>
+            </div>
+            <Editable
+              editor={editor}
+              renderElement={renderElement}
+              renderLeaf={renderLeaf}
+              style={{ padding: '15px', border: '1px solid #ccc', minHeight: '150px', margin: '10px', outline: 'none' }}
+              onKeyDown={event => {
+
+                if (event.shiftKey && event.key === 'Enter') {
+                  event.preventDefault()
+                  Transforms.insertNodes(
+                    editor,
+                    {
+                      type: 'paragraph',
+                      children: [{ text: '' }],
+                    },
+                  )
+                }
+
+                if (!event.ctrlKey) {
+                  return
+                }
+
+                switch (event.key) {
+                  case '`': {
+                    event.preventDefault()
+                    CustomEditor.toggleCodeBlock(editor)
+                    break
+                  }
+
+                  case 'b': {
+                    event.preventDefault()
+                    CustomEditor.toggleBoldMark(editor)
+                    break
+                  }
+                }
+              }}
+            />
+          </Slate>
+        </div>
       </div>
-      <Editable
-        editor={editor}
-        renderElement={renderElement}
-        renderLeaf={renderLeaf}
-        style={{ padding: '15px', border: '1px solid #ccc', minHeight: '150px', margin: '10px', outline: 'none' }}
-        onKeyDown={event => {
 
-          if (event.shiftKey && event.key === 'Enter') {
-            event.preventDefault()
-            Transforms.insertNodes(
-              editor,
-              {
-                type: 'paragraph',
-                children: [{ text: '' }],
-              },
-            )
-          }
-
-          if (!event.ctrlKey) {
-            return
-          }
-
-          switch (event.key) {
-            case '`': {
-              event.preventDefault()
-              CustomEditor.toggleCodeBlock(editor)
-              break
-            }
-
-            case 'b': {
-              event.preventDefault()
-              CustomEditor.toggleBoldMark(editor)
-              break
-            }
-          }
-        }}
-      />
-    </Slate>
+    </>
   )
 }
 
@@ -243,9 +278,12 @@ const CodeElement = props => {
       <div
         contentEditable={false}  // Important: prevent editing issues
         style={{
+          display: 'flex',                    // Add this
+          alignItems: 'center',               // Add this
+          justifyContent: 'space-between',
           height: '40px',
           marginBottom: '10px',
-          padding: '5px 15px',
+          padding: '10px 15px',
           backgroundColor: '#e0e0e0',
           color: 'white',
           border: 'none',
@@ -253,15 +291,12 @@ const CodeElement = props => {
           cursor: 'pointer',
           // border: '1px solid #ccc',
         }}>
-        <div style={{ position: 'absolute', left: '35px', top: '45px', color: '#888' }}>
+        <div style={{ color: '#888' }}>
           Code Block
         </div>
         <button
           contentEditable={false}  // Important: prevent editing issues
           style={{
-            position: 'absolute',
-            right: '30px',
-            top: '40px',
             padding: '5px 15px',
             backgroundColor: '#4CAF50',
             color: 'white',
@@ -281,7 +316,14 @@ const CodeElement = props => {
           <hr style={{ marginTop: '40px', marginBottom: '10px' }} />
         </div> */}
       </div>
-      <code style={{ margin: '10px 10px', padding: "10px" }}>{props.children}</code>
+      <code style={{
+        display: 'block',           // Make it a block element
+        margin: '0 10px',          // Horizontal margins
+        padding: '10px',           // Padding inside
+        whiteSpace: 'pre-wrap'     // Preserve whitespace and line breaks
+      }}>
+        {props.children}
+      </code>
     </pre>
   )
 }
