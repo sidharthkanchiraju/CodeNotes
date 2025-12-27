@@ -93,6 +93,23 @@ const CustomEditor = {
     return !!match
   },
 
+  isHeadingActive(editor, level) {
+    const [match] = Editor.nodes(editor, {
+      match: n => n.type === `heading${level}`,
+    })
+
+    return !!match
+  },
+
+  toggleHeading(editor, level) {
+    const isActive = CustomEditor.isHeadingActive(editor, level)
+    Transforms.setNodes(
+      editor,
+      { type: isActive ? null : `heading${level}` },
+      { match: n => Element.isElement(n) && Editor.isBlock(editor, n) }
+    )
+  },
+
   toggleBoldMark(editor) {
     const isActive = CustomEditor.isBoldMarkActive(editor)
     if (isActive) {
@@ -111,7 +128,7 @@ const CustomEditor = {
     }
   },
 
-  toggleStrikeMark(editor) {
+  toggleStrikethroughMark(editor) {
     const isActive = CustomEditor.isStrikethroughMarkActive(editor)
     if (isActive) {
       Editor.removeMark(editor, 'strikethrough')
@@ -223,14 +240,20 @@ const DefaultElement = props => {
 
 // Define a React component to render leaves with bold text.
 const Leaf = props => {
+  let style = {
+    fontWeight: props.leaf.bold ? 'bold' : 'normal',
+    fontStyle: props.leaf.italic ? 'italic' : 'normal',
+  };
+
+  if (props.leaf.strikethrough) {
+    style.textDecoration = 'line-through';
+  }
+
   return (
-    <span
-      {...props.attributes}
-      style={{ fontWeight: props.leaf.bold ? 'bold' : 'normal' }}
-    >
+    <span {...props.attributes} style={style}>
       {props.children}
     </span>
-  )
+  );
 }
 
 export { CustomEditor, withCodeBlocks, CodeElement, DefaultElement, Leaf }

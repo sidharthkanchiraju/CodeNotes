@@ -1,15 +1,43 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ChevronRight, ChevronDown, File, Folder } from 'lucide-react';
 
 const FileTreeItem = ({ item, onFileClick, level = 0 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [children, setChildren] = useState(item.children || []);
+  const [isLoading, setIsLoading] = useState(false);
   const isFolder = item.type === 'folder';
 
-  const handleClick = () => {
-    if (isFolder) {
-      setIsOpen(!isOpen);
+  const handleToggle = async () => {
+    if (item.type === 'folder') {
+      if (!isExpanded && children.length === 0) {
+        // Load children from file system
+        setIsLoading(true);
+        try {
+          const result = await window.api.readDirectory(item.path);
+          if (result.success) {
+            setChildren(result.files);
+          }
+        } catch (error) {
+          console.error('Error loading directory:', error);
+        }
+        setIsLoading(false);
+      }
+      setIsExpanded(!isExpanded);
+    }
+  };
+
+  const handleClick = async () => {
+    if (isFolder === false) {
+      try {
+        const result = await window.api.readFile(item.path);
+        if (result.success) {
+          onFileClick({ ...item, content: result.content });
+        }
+      } catch (error) {
+        console.error('Error reading file:', error);
+      }
     } else {
-      onFileClick(item);
+      handleToggle();
     }
   };
 
@@ -50,7 +78,32 @@ const FileTreeItem = ({ item, onFileClick, level = 0 }) => {
   );
 };
 
-const FileExplorer = ({ fileTree, onFileClick }) => {
+const FileExplorer = ({ initialPath, onFileClick }) => {
+  const [fileTree, setFileTree] = useState([]);
+  const [currentPath, setCurrentPath] = useState(initialPath || '');
+
+  useEffect(() => {
+    const loadInitialDirectory = async () => {
+      try {
+        let pathToLoad = currentPath;
+        if (!pathToLoad) {
+          const homeResult = await window.api.getHomePath();
+          pathToLoad = homeResult;
+        }
+        
+        const result = await window.api.readDirectory(pathToLoad);
+        if (result.success) {
+          setFileTree(result.files);
+          setCurrentPath(pathToLoad);
+        }
+      } catch (error) {
+        console.error('Error loading initial directory:', error);
+      }
+    };
+
+    loadInitialDirectory();
+  }, [initialPath]);
+
   return (
     <div style={{
       width: '250px',

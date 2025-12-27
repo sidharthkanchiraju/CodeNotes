@@ -60,6 +60,69 @@ ipcMain.handle('run-command', async (event, command) => {
   })
 })
 
+const { app, BrowserWindow, ipcMain } = require('electron');
+const fs = require('fs').promises;
+const path = require('path');
+const { exec } = require('child_process');
+const os = require('os');
+
+// Your existing handlers...
+
+ipcMain.handle('get-home-path', async () => {
+  return os.homedir();
+});
+
+ipcMain.handle('read-directory', async (event, dirPath) => {
+  try {
+    const items = await fs.readdir(dirPath, { withFileTypes: true });
+    
+    const fileTree = await Promise.all(
+      items.map(async (item) => {
+        const fullPath = path.join(dirPath, item.name);
+        const stats = await fs.stat(fullPath);
+        
+        if (item.isDirectory()) {
+          return {
+            name: item.name,
+            type: 'folder',
+            path: fullPath,
+            children: [] // We'll load children on demand
+          };
+        } else {
+          return {
+            name: item.name,
+            type: 'file',
+            path: fullPath,
+            size: stats.size
+          };
+        }
+      })
+    );
+    
+    return { success: true, files: fileTree };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('read-file', async (event, filePath) => {
+  try {
+    const content = await fs.readFile(filePath, 'utf-8');
+    return { success: true, content };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('write-file', async (event, filePath, content) => {
+  try {
+    await fs.writeFile(filePath, content, 'utf-8');
+    return { success: true, path: filePath };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
 app.whenReady().then(createWindow)
 
 app.on('window-all-closed', () => {

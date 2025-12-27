@@ -17,30 +17,29 @@ import { Toolbar } from './toolbar.js';
 
 const App = () => {
   const [editor] = useState(() => withCodeBlocks(withReact(createEditor())))
-  // test
-  const [fileTree] = useState([
-    {
-      name: 'src',
-      type: 'folder',
-      children: [
-        { name: 'App.js', type: 'file' },
-        { name: 'index.js', type: 'file' },
-        {
-          name: 'components',
-          type: 'folder',
-          children: [
-            { name: 'Header.js', type: 'file' },
-            { name: 'Footer.js', type: 'file' }
-          ]
-        }
-      ]
-    },
-    { name: 'package.json', type: 'file' },
-    { name: 'README.md', type: 'file' }
-  ]);
-
+  
   const handleFileClick = (file) => {
     console.log('File clicked:', file);
+
+    // Load the file content into the editor
+    if (file.content) {
+      const newValue = [
+        {
+          type: 'paragraph',
+          children: [{ text: file.content }],
+        },
+      ];
+
+      // Update the editor
+      Transforms.delete(editor, {
+        at: {
+          anchor: Editor.start(editor, []),
+          focus: Editor.end(editor, []),
+        },
+      });
+
+      Transforms.insertNodes(editor, newValue);
+    }
   };
 
   const initialValue = useMemo(
@@ -58,6 +57,12 @@ const App = () => {
     switch (props.element.type) {
       case 'code':
         return <CodeElement {...props} />
+      case 'heading1':
+        return <h1 {...props.attributes}>{props.children}</h1>
+      case 'heading2':
+        return <h2 {...props.attributes}>{props.children}</h2>
+      case 'heading3':
+        return <h3 {...props.attributes}>{props.children}</h3>
       default:
         return <DefaultElement {...props} />
     }
@@ -70,7 +75,7 @@ const App = () => {
   return (
     <>
       <div style={{ display: 'flex' }}>
-        <FileExplorer fileTree={fileTree} onFileClick={handleFileClick} />
+        <FileExplorer initialPath={"/Users/sidharthkanchiraju/Downloads"} onFileClick={handleFileClick} />
         <div style={{ flex: 1, padding: '20px' }}>
           <Slate editor={editor} initialValue={initialValue}
             onChange={value => {
@@ -85,24 +90,6 @@ const App = () => {
             }}
           >
             <div>
-              <button
-                style={{ margin: '10px' }}
-                onMouseDown={event => {
-                  event.preventDefault()
-                  CustomEditor.toggleBoldMark(editor)
-                }}
-              >
-                Bold
-              </button>
-              <button
-                style={{ margin: '10px' }}
-                onMouseDown={event => {
-                  event.preventDefault()
-                  CustomEditor.toggleCodeBlock(editor)
-                }}
-              >
-                Code Block
-              </button>
               <Toolbar editor={editor} />
             </div>
             <Editable
